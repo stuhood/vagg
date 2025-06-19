@@ -5,7 +5,11 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
+async-stream = "0.3.6"
 datafusion = { version = "47", default-features = false }
+futures = "0.3.31"
+serde = "1.0.219"
+serde_json = "1.0.140"
 tempfile = "3.20.0"
 thiserror = "2.0.12"
 tokio = { version = "1.45.1", features = ["rt-multi-thread", "fs"] }
