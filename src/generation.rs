@@ -14,6 +14,8 @@ struct Metadata {
 pub struct BenchmarkLog {
     pub id: u64,
     pub message: &'static str,
+    pub message_matches_research: bool,
+    pub message_matches_team: bool,
     pub country: &'static str,
     pub severity: i32,
     pub timestamp: u64,
@@ -66,6 +68,8 @@ pub fn generate_logs(num_rows: u64) -> impl Stream<Item = BenchmarkLog> {
 
         for i in 0..(num_rows as usize) {
             let message = MESSAGES[i % MESSAGES.len()];
+            let message_matches_research = message.contains("research");
+            let message_matches_team = message.contains("team");
             let country = COUNTRIES[i % COUNTRIES.len()];
             let label = LABELS[i % LABELS.len()];
             let severity = (i % 5) as i32 + 1;
@@ -78,6 +82,8 @@ pub fn generate_logs(num_rows: u64) -> impl Stream<Item = BenchmarkLog> {
             yield BenchmarkLog {
                 id: i as u64,
                 message,
+                message_matches_research,
+                message_matches_team,
                 country,
                 severity,
                 timestamp,

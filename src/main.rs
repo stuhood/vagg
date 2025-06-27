@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     VortexWriteOptions::default()
-        .write(f, row_array_stream(10_000_000))
+        .write(f, row_array_stream(100_000_000))
         .await?;
 
     let ctx = SessionContext::new();
@@ -68,6 +68,8 @@ fn row_array_stream(num_rows: u64) -> impl ArrayStream + Unpin {
     let field_dtypes = vec![
         DType::Primitive(PType::U64, Nullability::NonNullable),
         DType::Utf8(Nullability::NonNullable),
+        DType::Bool(Nullability::NonNullable),
+        DType::Bool(Nullability::NonNullable),
         DType::Utf8(Nullability::NonNullable),
         DType::Primitive(PType::I32, Nullability::NonNullable),
         DType::Primitive(PType::U64, Nullability::NonNullable),
@@ -77,6 +79,8 @@ fn row_array_stream(num_rows: u64) -> impl ArrayStream + Unpin {
         vec![
             "id".into(),
             "message".into(),
+            "message_matches_research".into(),
+            "message_matches_team".into(),
             "country".into(),
             "severity".into(),
             "timestamp".into(),
@@ -103,10 +107,12 @@ fn row_array_stream(num_rows: u64) -> impl ArrayStream + Unpin {
             for row in chunk {
                 builders[0].append_scalar_value(row.id.into())?;
                 builders[1].append_scalar_value(row.message.into())?;
-                builders[2].append_scalar_value(row.country.into())?;
-                builders[3].append_scalar_value(row.severity.into())?;
-                builders[4].append_scalar_value(row.timestamp.into())?;
-                builders[5].append_scalar_value(row.metadata.into())?;
+                builders[2].append_scalar_value(row.message_matches_research.into())?;
+                builders[3].append_scalar_value(row.message_matches_team.into())?;
+                builders[4].append_scalar_value(row.country.into())?;
+                builders[5].append_scalar_value(row.severity.into())?;
+                builders[6].append_scalar_value(row.timestamp.into())?;
+                builders[7].append_scalar_value(row.metadata.into())?;
             }
 
             yield Ok(StructArray::try_new_with_dtype(
@@ -126,16 +132,16 @@ async fn run_queries(ctx: &SessionContext) -> anyhow::Result<()> {
     let queries = vec![
         (
             "count-filter",
-            "SELECT COUNT(*) FROM vortex_tbl WHERE message ~~ '%team%'",
+            "SELECT COUNT(*) FROM vortex_tbl WHERE message_matches_team = true",
         ),
         ("count-nofilter", "SELECT COUNT(id) FROM vortex_tbl"),
         (
             "count-filter",
-            "SELECT COUNT(id) FROM vortex_tbl WHERE message ~~ '%team%'",
+            "SELECT COUNT(id) FROM vortex_tbl WHERE message_matches_team = true",
         ),
         (
             "cardinality",
-            "SELECT COUNT(DISTINCT severity) FROM vortex_tbl WHERE message ~~ '%research%'",
+            "SELECT COUNT(DISTINCT severity) FROM vortex_tbl WHERE message_matches_research = true",
         ),
         (
             "bucket-string-nofilter",
@@ -143,7 +149,7 @@ async fn run_queries(ctx: &SessionContext) -> anyhow::Result<()> {
         ),
         (
             "bucket-string-filter",
-            "SELECT country, COUNT(*) FROM vortex_tbl WHERE message ~~ '%research%' GROUP BY country ORDER BY country",
+            "SELECT country, COUNT(*) FROM vortex_tbl WHERE message_matches_research = true GROUP BY country ORDER BY country",
         ),
         (
             "bucket-numeric-nofilter",
@@ -151,32 +157,32 @@ async fn run_queries(ctx: &SessionContext) -> anyhow::Result<()> {
         ),
         (
             "bucket-numeric-filter",
-            "SELECT severity, COUNT(*) FROM vortex_tbl WHERE message ~~ '%research%' GROUP BY severity ORDER BY severity",
+            "SELECT severity, COUNT(*) FROM vortex_tbl WHERE message_matches_research = true GROUP BY severity ORDER BY severity",
         ),
         (
             "top_n-compound",
-            "SELECT * FROM vortex_tbl WHERE message ~~ '%research%' AND country = 'Canada' ORDER BY severity, timestamp LIMIT 10",
+            "SELECT * FROM vortex_tbl WHERE message_matches_research = true AND country = 'Canada' ORDER BY severity, timestamp LIMIT 10",
         ),
         (
             "top_n-numeric-lowcard",
-            "SELECT * FROM vortex_tbl WHERE message ~~ '%research%' AND country = 'Canada' ORDER BY severity LIMIT 10",
+            "SELECT * FROM vortex_tbl WHERE message_matches_research = true AND country = 'Canada' ORDER BY severity LIMIT 10",
         ),
         (
             "top_n-numeric-highcard",
-            "SELECT * FROM vortex_tbl WHERE message ~~ '%research%' AND country = 'Canada' ORDER BY timestamp LIMIT 10",
+            "SELECT * FROM vortex_tbl WHERE message_matches_research = true AND country = 'Canada' ORDER BY timestamp LIMIT 10",
         ),
         (
             "top_n-string",
-            "SELECT * FROM vortex_tbl WHERE message ~~ '%research%' AND country = 'Canada' ORDER BY country LIMIT 10",
+            "SELECT * FROM vortex_tbl WHERE message_matches_research = true AND country = 'Canada' ORDER BY country LIMIT 10",
         ),
         (
             "filtered-lowcard",
-            "SELECT * FROM vortex_tbl WHERE message ~~ '%research%' AND country = 'Canada' AND severity < 3 LIMIT 10",
+            "SELECT * FROM vortex_tbl WHERE message_matches_research = true AND country = 'Canada' AND severity < 3 LIMIT 10",
         ),
         (
             "filtered-highcard",
             // '2020-10-02' as a unix timestamp.
-            "SELECT * FROM vortex_tbl WHERE message ~~ '%research%' AND country = 'Canada' AND timestamp >= 1601622000 LIMIT 10",
+            "SELECT * FROM vortex_tbl WHERE message_matches_research = true AND country = 'Canada' AND timestamp >= 1601622000 LIMIT 10",
         ),
     ];
     for (query_type, query) in queries {
